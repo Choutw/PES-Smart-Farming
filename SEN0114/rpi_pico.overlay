@@ -1,23 +1,25 @@
-
-	&i2c0 {
-
-		status = "okay";
-
-		bme680@77 {
-			compatible = "bosch,bme680";
-			reg = <0x77>;
-		};
-		veml7700@10 {
-			compatible = "veml7700";
-			reg = <0x10>;
-		};
-
-	};
- 
-	&adc { /* ADC */
- 		status = "okay";
-	};
-
+/ {
 	aliases {
-   		adcctrl = &adc;
+		adcctrl = &adc;
 	};
+};
+
+&adc { /* ADC */
+	status = "okay";
+};	
+
+&i2c0 {
+
+	status = "okay";
+	bme680@77 {
+		compatible = "bosch,bme680";
+		reg = <0x77>;
+	};
+
+	veml7700@10 {
+		compatible = "veml7700";
+		reg = <0x10>;
+	};
+};
+
+
