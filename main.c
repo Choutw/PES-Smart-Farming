@@ -6,11 +6,15 @@
 #include <zephyr/drivers/sensor.h>
 #include <stdio.h>
 #include <bme680_reg.h>
+#include <veml7700_reg.h>
 
 #define BME680_ADDR     0x77
+#define veml7700        0x10
+#define COMMAND_CODE    0x00
 #define MY_STACK_SIZE   5000
 
 const struct device *i2c_dev ;
+
 int32_t temp_convert(uint32_t temp_adc, int32_t  p1,int32_t  p2,int32_t  p3 ){
     int32_t var1 = ((int32_t)temp_adc >> 3) - ((int32_t)p1<< 1);
     int32_t var2 = (var1* (int32_t)p2) >> 11;
@@ -42,6 +46,7 @@ void main(void)
     int32_t p1,p2,p3;
     int32_t h1,h2,h3,h4,h5,h6,h7;
     int32_t temp_comp;
+    uint8_t light[2];
     // Initialize I2C bus
     i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0)); 
 
@@ -80,6 +85,7 @@ void main(void)
     while(1){
 
         i2c_reg_write_byte(i2c_dev, BME680_ADDR,BME680_CTRL_MEAS,0b010 << 5 | 0b01);//force mode: 01
+        
 
         //tempuratue below
         i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_MSB,&data[0]);
@@ -105,9 +111,34 @@ void main(void)
 
         printk("Room humidity is %d percent\n", humidity_convert(temp_comp,humidity_adc,h1,h2,h3,h4,h5,h6,h7)/10000);
 
-
-
-        k_msleep(3000);
+        //read light value
+        int ret=i2c_reg_write_byte(i2c_dev, veml7700, COMMAND_CODE,0x00);//mode
+        if (ret != 0) {
+            printk("Failed to write command to VEML7700\n");
+            //continue;
+        }else{
+            printk("good\n");
+        }
+        //i2c_reg_read_byte(i2c_dev,veml7700,VEML7700_High_Resolution_Output_Data, &light);
+        i2c_burst_read(i2c_dev,veml7700,VEML7700_High_Resolution_Output_Data,(uint8_t*)&light,2);
+        int16_t lightvalue=((int16_t)light[1]<<8) | (int16_t)light[0];//1 0
+        printk("light is %d\n",lightvalue);
+        
+        k_msleep(3000);//3000
 
     } 
 }
+//1 1101 0100 1100 0000
+//light lux formula page 10 formula
+//burst_read
+/*
+
+Natural Light Condition	    Typical Lux
+Direct Sunlight	            32,000 to 100,000
+Ambient Daylight	        10,000 to 25,000
+Overcast Daylight	        1000
+Sunset & Sunrise	        400
+Moonlight (Full moon)	    1
+Night (No moon)	            < 0.01
+
+*/
