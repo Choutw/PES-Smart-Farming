@@ -1,5 +1,5 @@
 #include "inc/AnalogIn.h"
-#include <adc.h>
+#include <zephyr/drivers/adc.h>
 #include <string.h>
 
 // Simple analog input method
@@ -8,7 +8,8 @@
 // ADC Sampling Settings
 // doc says that impedance of 800K == 40usec sample time
 
-#define ADC_DEVICE_NAME		DT_LABEL(DT_ALIAS(adcctrl))
+//#define ADC_DEVICE_NAME		DT_LABEL(DT_ALIAS(adcctrl))
+#define ADC_DEVICE_NAME     DEVICE_DT_GET(DT_NODELABEL(adc))
 #define ADC_RESOLUTION		10
 #define ADC_GAIN			ADC_GAIN_1_6
 #define ADC_REFERENCE		ADC_REF_INTERNAL
@@ -32,15 +33,16 @@ static struct adc_channel_cfg m_1st_channel_cfg = {
 };
 
 // return device* for the adc
-static const struct device* getAdcDevice(void)
-{
+static const struct device* getAdcDevice(void){
+
 	return device_get_binding(ADC_DEVICE_NAME);
+
 }
 
 // initialize the adc channel
-static const struct device* init_adc(int channel)
-{
-	int ret;
+static const struct device* init_adc(int channel){
+	
+    int ret;
 	const struct device *adc_dev = getAdcDevice();
 	if(_LastChannel != channel)
 	{
@@ -74,8 +76,8 @@ static const struct device* init_adc(int channel)
 // ------------------------------------------------
 // read one channel of adc
 // ------------------------------------------------
-static int16_t readOneChannel(int channel)
-{
+static int16_t readOneChannel(int channel){
+
 	const struct adc_sequence sequence = {
 		.options     = NULL,				// extra samples and callback
 		.channels    = BIT(channel),		// bit mask of channels to read
@@ -104,8 +106,7 @@ static int16_t readOneChannel(int channel)
 // ------------------------------------------------
 // high level read adc channel and convert to float voltage
 // ------------------------------------------------
-float AnalogRead(int channel)
-{
+float AnalogRead(int channel){
 
 	int16_t sv = readOneChannel(channel);
 	if(sv == BAD_ANALOG_READ)
@@ -118,9 +119,8 @@ float AnalogRead(int channel)
 																				  
 	int multip = 256;
 	// find 2**adc_resolution
-	switch(ADC_RESOLUTION)
-				
-	{
+	switch(ADC_RESOLUTION){
+
 		default :
 		case 8 :
 			multip = 256;
