@@ -9,7 +9,7 @@
 // doc says that impedance of 800K == 40usec sample time
 
 //#define ADC_DEVICE_NAME		DT_LABEL(DT_ALIAS(adcctrl))
-#define ADC_DEVICE_NAME     DEVICE_DT_GET(DT_NODELABEL(adc))
+//#define ADC_DEVICE_NAME     DEVICE_DT_GET(DT_NODELABEL(adc))
 #define ADC_RESOLUTION		10
 #define ADC_GAIN			ADC_GAIN_1_6
 #define ADC_REFERENCE		ADC_REF_INTERNAL
@@ -35,7 +35,17 @@ static struct adc_channel_cfg m_1st_channel_cfg = {
 // return device* for the adc
 static const struct device* getAdcDevice(void){
 
-	return device_get_binding(ADC_DEVICE_NAME);
+    /* Define adc device */
+	const struct device *const adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
+
+	if (adc_dev == NULL || !device_is_ready(adc_dev)) {
+		printk("INFO: ADC device is not found.\n");
+		return NULL;
+	}
+	else{
+		printk("INFO: ADC device connected.\n");
+        return device_get_binding(adc_dev);
+	}
 
 }
 
