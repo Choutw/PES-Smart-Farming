@@ -8,8 +8,11 @@
 // ADC Sampling Settings
 // doc says that impedance of 800K == 40usec sample time
 
-//#define ADC_DEVICE_NAME		DT_LABEL(DT_ALIAS(adcctrl))
-//#define ADC_DEVICE_NAME     DEVICE_DT_GET(DT_NODELABEL(adc))
+//   # the sensor value description
+//   # 0  ~300     dry soil
+//   # 300~700     humid soil
+//   # 700~950     in water
+
 #define ADC_RESOLUTION		10
 #define ADC_GAIN			ADC_GAIN_1_6
 #define ADC_REFERENCE		ADC_REF_INTERNAL
@@ -144,4 +147,16 @@ float AnalogRead(int channel){
 	// the 3.6 relates to the voltage divider being used in my circuit
 	float fout = (sv * 3.6 / multip);
 	return fout;
+}
+
+int main(int argc, char const *argv[])
+{
+	while (1)
+	{
+		float m_value;
+		m_value = AnalogRead(0);
+		printk("m value : %f\n", m_value);
+	}
+
+	return 0;
 }
