@@ -32,28 +32,23 @@ static struct adc_channel_cfg m_1st_channel_cfg = {
 #endif
 };
 
-// return device* for the adc
-static const struct device* getAdcDevice(void){
 
-    /* Define adc device */
-	const struct device *const adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
-
-	if (adc_dev == NULL || !device_is_ready(adc_dev)) {
-		printk("INFO: ADC device is not found.\n");
-		return NULL;
-	}
-	else{
-		printk("INFO: ADC device connected.\n");
-        return device_get_binding(adc_dev);
-	}
-
-}
 
 // initialize the adc channel
 static const struct device* init_adc(int channel){
 	
     int ret;
-	const struct device *adc_dev = getAdcDevice();
+
+    /* Define adc device */
+	const struct device *adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
+
+    if (adc_dev == NULL || !device_is_ready(adc_dev)) {
+		printk("INFO: ADC device is not found.\n");
+	}
+	else{
+		printk("INFO: ADC device connected.\n");
+	}
+
 	if(_LastChannel != channel)
 	{
 		_IsInitialized = false;
