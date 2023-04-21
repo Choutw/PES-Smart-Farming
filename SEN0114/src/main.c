@@ -1,6 +1,7 @@
 #include "inc/AnalogIn.h"
 #include <zephyr/drivers/adc.h>
 #include <string.h>
+#include <stdio.h>
 
 // Simple analog input method
 // this just reads a sample then waits then returns it
@@ -43,7 +44,7 @@ static const struct device* init_adc(int channel){
     int ret;
 
     /* Define adc device */
-	const struct device *adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
+	const struct device *const adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
 
     if (adc_dev == NULL || !device_is_ready(adc_dev)) {
 		printk("INFO: ADC device is not found.\n");
@@ -68,8 +69,8 @@ static const struct device* init_adc(int channel){
 		ret = adc_channel_setup(adc_dev, &m_1st_channel_cfg);
 		if(ret != 0)
 		{
-			//LOG_INF("Setting up of the first channel failed with code %d", ret);
-			adc_dev = NULL;
+			printk("Setting up of the first channel failed with code %d\n", ret);
+		    //adc_dev = \0;
 		}
 		else
 		{
@@ -98,15 +99,22 @@ static int16_t readOneChannel(int channel){
 
 	int ret;
 	int16_t sample_value = BAD_ANALOG_READ;
-	const struct device *adc_dev = init_adc(channel);
+	const struct device *const adc_dev = init_adc(channel);
 	if (adc_dev)
 	{
 		ret = adc_read(adc_dev, &sequence);
 		if(ret == 0)
 		{
+            printk("Buffer read successfully.\n");
 			sample_value = m_sample_buffer[0];
 		}
+        else{
+            printk("Buffer read failes.\n");
+        }
 	}
+    else{
+        printk("adc_dev is not init....\n");
+    }
 
 	return sample_value;
 }
@@ -121,6 +129,9 @@ float AnalogRead(int channel){
 	{
 		return sv;
 	}
+    else{
+        printk("Reading good with ADC....\n");
+    }
 
 	// Convert the result to voltage
 	// Result = [V(p) - V(n)] * GAIN/REFERENCE / 2^(RESOLUTION)
@@ -146,19 +157,26 @@ float AnalogRead(int channel){
 	
 	// the 3.6 relates to the voltage divider being used in my circuit
 	float fout = (sv * 3.6 / multip);
+
+    printk("fout check point...\n");
+    printf("Float normal with %f\n", fout);
+
 	return fout;
 }
 
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]){
+    
+    float m_value;
+
 	while (1)
 	{
+        printk("------------------------");
+
         k_msleep(3000);
-		float m_value;
-		m_value = AnalogRead(0);
-		printk("m value : %f\n", m_value);
+
+		m_value = 1000 * AnalogRead(0);
+		printf("Moisture value : %.8f\n", m_value);
 	}
 
 	return 0;
 }
-
