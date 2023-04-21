@@ -153,6 +153,7 @@ int main(int argc, char const *argv[])
 {
 	while (1)
 	{
+        k_msleep(3000);
 		float m_value;
 		m_value = AnalogRead(0);
 		printk("m value : %f\n", m_value);
@@ -160,3 +161,4 @@ int main(int argc, char const *argv[])
 
 	return 0;
 }
+
