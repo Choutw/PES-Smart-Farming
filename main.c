@@ -3,17 +3,18 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
-#include <zephyr/drivers/sensor.h>
 #include <stdio.h>
 #include <bme680_reg.h>
-#include <veml7700_reg.h>
+
 
 #define BME680_ADDR     0x77
 #define veml7700        0x10
 #define COMMAND_CODE    0x00
 #define MY_STACK_SIZE   5000
 
-const struct device *i2c_dev ;
+#define VEML7700_High_Resolution_Output_Data 0x04
+
+const struct device *i2c_dev;
 
 int32_t temp_convert(uint32_t temp_adc, int32_t  p1,int32_t  p2,int32_t  p3 ){
     int32_t var1 = ((int32_t)temp_adc >> 3) - ((int32_t)p1<< 1);
@@ -39,7 +40,7 @@ int32_t humidity_convert(int32_t temp_comp,uint32_t humidity_adc,int32_t h1,int3
 void main(void)
 {
     uint8_t  data[3];
-    uint8_t h_data[2];//humidity register
+    uint8_t h_data[2]; //humidity register
     uint32_t temp_adc, humidity_adc;
     uint8_t  par_t[5];
     uint8_t par_h[9];//humidity register
@@ -80,13 +81,10 @@ void main(void)
     h6=(int32_t)par_h[7];
     h7=(int32_t)par_h[8];
 
-
-
     while(1){
 
         i2c_reg_write_byte(i2c_dev, BME680_ADDR,BME680_CTRL_MEAS,0b010 << 5 | 0b01);//force mode: 01
         
-
         //tempuratue below
         i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_MSB,&data[0]);
         i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_LSB,&data[1]);
@@ -113,6 +111,7 @@ void main(void)
 
         //read light value
         int ret=i2c_reg_write_byte(i2c_dev, veml7700, COMMAND_CODE,0x00);//mode
+        
         if (ret != 0) {
             printk("Failed to write command to VEML7700\n");
             //continue;
