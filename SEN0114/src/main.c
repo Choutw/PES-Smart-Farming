@@ -1,3 +1,8 @@
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+
 #include "inc/AnalogIn.h"
 #include <zephyr/drivers/adc.h>
 #include <string.h>
@@ -13,6 +18,7 @@
 //   # 0  ~300     dry soil
 //   # 300~700     humid soil
 //   # 700~950     in water
+
 
 #define ADC_RESOLUTION		10
 #define ADC_GAIN			ADC_GAIN_1_6
@@ -38,12 +44,25 @@ static struct adc_channel_cfg m_1st_channel_cfg = {
 
 
 
-// initialize the adc channel
-static const struct device* init_adc(int channel){
-	
-    int ret;
+// ------------------------------------------------
+// read one channel of adc
+// ------------------------------------------------
+static int16_t readOneChannel(int channel){
 
-    /* Define adc device */
+	const struct adc_sequence sequence = {
+		.options     = NULL,				// extra samples and callback
+		.channels    = BIT(channel),		// bit mask of channels to read
+		.buffer      = m_sample_buffer,		// where to put samples read
+		.buffer_size = sizeof(m_sample_buffer),
+		.resolution  = ADC_RESOLUTION,		// desired resolution
+		.oversampling = 0,					// don't oversample
+		.calibrate = 0						// don't calibrate
+	};
+
+	int ret;
+	int16_t sample_value = BAD_ANALOG_READ;
+	
+	// Set ADC Device
 	const struct device *const adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
 
     if (adc_dev == NULL || !device_is_ready(adc_dev)) {
@@ -77,29 +96,10 @@ static const struct device* init_adc(int channel){
 			_IsInitialized = true;	// we don't have any other analog users
 		}
 	}
-	
+
 	memset(m_sample_buffer, 0, sizeof(m_sample_buffer));
-	return adc_dev;
-}
 
-// ------------------------------------------------
-// read one channel of adc
-// ------------------------------------------------
-static int16_t readOneChannel(int channel){
 
-	const struct adc_sequence sequence = {
-		.options     = NULL,				// extra samples and callback
-		.channels    = BIT(channel),		// bit mask of channels to read
-		.buffer      = m_sample_buffer,		// where to put samples read
-		.buffer_size = sizeof(m_sample_buffer),
-		.resolution  = ADC_RESOLUTION,		// desired resolution
-		.oversampling = 0,					// don't oversample
-		.calibrate = 0						// don't calibrate
-	};
-
-	int ret;
-	int16_t sample_value = BAD_ANALOG_READ;
-	const struct device *const adc_dev = init_adc(channel);
 	if (adc_dev)
 	{
 		ret = adc_read(adc_dev, &sequence);
@@ -119,63 +119,21 @@ static int16_t readOneChannel(int channel){
 	return sample_value;
 }
 
-// ------------------------------------------------
-// high level read adc channel and convert to float voltage
-// ------------------------------------------------
-float AnalogRead(int channel){
-
-	int16_t sv = readOneChannel(channel);
-	if(sv == BAD_ANALOG_READ)
-	{
-		return sv;
-	}
-    else{
-        printk("Reading good with ADC....\n");
-    }
-
-	// Convert the result to voltage
-	// Result = [V(p) - V(n)] * GAIN/REFERENCE / 2^(RESOLUTION)
-																				  
-	int multip = 256;
-	// find 2**adc_resolution
-	switch(ADC_RESOLUTION){
-
-		default :
-		case 8 :
-			multip = 256;
-			break;
-		case 10 :
-			multip = 1024;
-			break;
-		case 12 :
-			multip = 4096;
-			break;
-		case 14 :
-			multip = 16384;
-			break;
-	}
-	
-	// the 3.6 relates to the voltage divider being used in my circuit
-	float fout = (sv * 3.6 / multip);
-
-    printk("fout check point...\n");
-    printf("Float normal with %f\n", fout);
-
-	return fout;
-}
-
-int main(int argc, char const *argv[]){
+int main(){
     
-    float m_value;
+    int16_t m_value;
+	int16_t sv;
 
-	while (1)
-	{
+	while (1){
+
         printk("------------------------");
 
         k_msleep(3000);
 
-		m_value = 1000 * AnalogRead(0);
-		printf("Moisture value : %.8f\n", m_value);
+		sv = readOneChannel(0);
+
+		m_value = sv;
+		printk("Moisture value : %d\n", m_value);
 	}
 
 	return 0;
