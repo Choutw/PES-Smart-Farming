@@ -19,6 +19,7 @@
 //   # 300~700     humid soil
 //   # 700~950     in water
 
+#define ADC_RESOLUTION		14
 #define ADC_GAIN			ADC_GAIN_1_6
 #define ADC_REFERENCE		ADC_REF_INTERNAL
 #define ADC_ACQUISITION_TIME	ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)
@@ -42,25 +43,13 @@ static struct adc_channel_cfg m_1st_channel_cfg = {
 
 
 
-// ------------------------------------------------
-// read one channel of adc
-// ------------------------------------------------
-static int16_t readOneChannel(int channel){
-
-	const struct adc_sequence sequence = {
-		.options     = NULL,				// extra samples and callback
-		.channels    = BIT(channel),		// bit mask of channels to read
-		.buffer      = m_sample_buffer,		// where to put samples read
-		.buffer_size = sizeof(m_sample_buffer),
-		.oversampling = 0,					// don't oversample
-		.calibrate = 0						// don't calibrate
-	};
-
+// initialize the adc channel
+static const struct device* init_adc(int channel)
+{
 	int ret;
-	int16_t sample_value = BAD_ANALOG_READ;
 	
-	// Set ADC Device
-	const struct device *const adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
+	// Define adc device 
+	const struct device *adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
 
     if (adc_dev == NULL || !device_is_ready(adc_dev)) {
 		printk("INFO: ADC device is not found.\n");
@@ -85,53 +74,97 @@ static int16_t readOneChannel(int channel){
 		ret = adc_channel_setup(adc_dev, &m_1st_channel_cfg);
 		if(ret != 0)
 		{
-			printk("Setting up of the first channel failed with code %d\n", ret);
-		    //adc_dev = \0;
+			//LOG_INF("Setting up of the first channel failed with code %d", ret);
+			adc_dev = NULL;
 		}
 		else
 		{
 			_IsInitialized = true;	// we don't have any other analog users
 		}
 	}
-
+	
 	memset(m_sample_buffer, 0, sizeof(m_sample_buffer));
+	return adc_dev;
+}
 
+// ------------------------------------------------
+// read one channel of adc
+// ------------------------------------------------
+static int16_t readOneChannel(int channel)
+{
+	const struct adc_sequence sequence = {
+		.options     = NULL,				// extra samples and callback
+		.channels    = BIT(channel),		// bit mask of channels to read
+		.buffer      = m_sample_buffer,		// where to put samples read
+		.buffer_size = sizeof(m_sample_buffer),
+		.resolution  = ADC_RESOLUTION,		// desired resolution
+		.oversampling = 0,					// don't oversample
+		.calibrate = 0						// don't calibrate
+	};
 
+	int ret;
+	int16_t sample_value = BAD_ANALOG_READ;
+	const struct device *adc_dev = init_adc(channel);
 	if (adc_dev)
 	{
 		ret = adc_read(adc_dev, &sequence);
 		if(ret == 0)
 		{
-            printk("Buffer read successfully.\n");
 			sample_value = m_sample_buffer[0];
 		}
-        else{
-            printk("Buffer read failes.\n");
-        }
 	}
-    else{
-        printk("adc_dev is not init....\n");
-    }
 
 	return sample_value;
 }
 
+// ------------------------------------------------
+// high level read adc channel and convert to float voltage
+// ------------------------------------------------
+float AnalogRead(int channel)
+{
+
+	int16_t sv = readOneChannel(channel);
+	if(sv == BAD_ANALOG_READ)
+	{
+		return sv;
+	}
+
+	// Convert the result to voltage
+	// Result = [V(p) - V(n)] * GAIN/REFERENCE / 2^(RESOLUTION)
+																				  
+	int multip = 256;
+	// find 2**adc_resolution
+	switch(ADC_RESOLUTION)
+				
+	{
+		default :
+		case 8 :
+			multip = 256;
+			break;
+		case 10 :
+			multip = 1024;
+			break;
+		case 12 :
+			multip = 4096;
+			break;
+		case 14 :
+			multip = 16384;
+			break;
+	}
+	
+	float fout = (sv * 3.3 / multip);
+	return fout;
+}
+
 int main(){
-    
+
     float m_value;
-	int16_t sv;
 
-	while (1){
-
-        printk("------------------------\n");
-
+	while (1)
+	{
         k_msleep(3000);
-
-		sv = readOneChannel(0);
-
-		m_value = sv * 3.3 / 1024;
-
-		printf("Moisture value : %.6f\n", m_value);
+		m_value = AnalogRead(0);
+		printf("m value : %.8f\n", m_value);
 	}
 
 	return 0;
