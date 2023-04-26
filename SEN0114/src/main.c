@@ -19,8 +19,6 @@
 //   # 300~700     humid soil
 //   # 700~950     in water
 
-
-#define ADC_RESOLUTION		10
 #define ADC_GAIN			ADC_GAIN_1_6
 #define ADC_REFERENCE		ADC_REF_INTERNAL
 #define ADC_ACQUISITION_TIME	ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)
@@ -54,7 +52,6 @@ static int16_t readOneChannel(int channel){
 		.channels    = BIT(channel),		// bit mask of channels to read
 		.buffer      = m_sample_buffer,		// where to put samples read
 		.buffer_size = sizeof(m_sample_buffer),
-		.resolution  = ADC_RESOLUTION,		// desired resolution
 		.oversampling = 0,					// don't oversample
 		.calibrate = 0						// don't calibrate
 	};
@@ -121,19 +118,20 @@ static int16_t readOneChannel(int channel){
 
 int main(){
     
-    int16_t m_value;
+    float m_value;
 	int16_t sv;
 
 	while (1){
 
-        printk("------------------------");
+        printk("------------------------\n");
 
         k_msleep(3000);
 
 		sv = readOneChannel(0);
 
-		m_value = sv;
-		printk("Moisture value : %d\n", m_value);
+		m_value = sv * 3.3 / 1024;
+
+		printf("Moisture value : %.6f\n", m_value);
 	}
 
 	return 0;
