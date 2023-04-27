@@ -183,7 +183,7 @@ void svf_i2c_loop(void){
 
     humidity_adc = ((uint32_t)h_data[0]) | ((uint32_t)h_data[1])<<8 ;
 
-    printk("H: %d (\%)\n", humidity_convert(temp_comp,humidity_adc,h1,h2,h3,h4,h5,h6,h7)/10000);
+    printk("H: %d (\%)\n", humidity_convert(temp_comp,humidity_adc,h1,h2,h3,h4,h5,h6,h7)/1000);
 
     //read light value
     int ret=i2c_reg_write_byte(i2c_dev, veml7700, COMMAND_CODE, 0x00);//mode
