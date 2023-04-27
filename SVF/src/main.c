@@ -121,7 +121,7 @@ void svf_i2c_init(void){
 		return;
 	}
 	else{
-		printk("I2C: BME 680, VENL 7700\n");
+		printk("I2C: BME 680, VEML 7700\n");
 	}
 
     //tempurature register
