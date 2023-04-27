@@ -158,46 +158,48 @@ void svf_i2c_init(void){
 
 void svf_i2c_loop(void){
 
-	i2c_reg_write_byte(i2c_dev, BME680_ADDR,BME680_CTRL_MEAS,0b010 << 5 | 0b01);//force mode: 01
+	i2c_reg_write_byte(i2c_dev, BME680_ADDR,BME680_CTRL_HUM,0b001);//force mode: 01	
+    i2c_reg_write_byte(i2c_dev, BME680_ADDR,BME680_CTRL_MEAS,0b010 << 5 | 0b01);//force mode: 01
+
+    //tempuratue below
+    i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_MSB,&data[0]);
+    i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_LSB,&data[1]);
+    i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_XLSB,&data[2]); 
+
+    temp_adc=((uint32_t)data[0])<<12 | ((uint32_t)data[1])<<4 | ((uint32_t)data[2])>>4;
+    temp_comp=temp_convert(temp_adc,p1,p2,p3);
+    printk("T: %d (degrees Celsius)\n", temp_comp/100);
+
+    //humidity below
+    i2c_reg_read_byte(i2c_dev, BME680_ADDR,0xE2,&par_h[0]);//vary
+    i2c_reg_read_byte(i2c_dev, BME680_ADDR,0xE2,&par_h[2]);//vary
+    h1=(int32_t)(((uint16_t)par_h[0]&0b1111) | ((uint16_t)par_h[1]<<4));
+    h2=(int32_t)(((uint16_t)par_h[2]>>4) | ((uint16_t)par_h[3]<<4));
         
-        //tempuratue below
-        i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_MSB,&data[0]);
-        i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_LSB,&data[1]);
-        i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_TEMP_XLSB,&data[2]); 
+    // BME680_HUM_LSB      0x26
+    // BME680_HUM_MSB      0x25 
+    i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_HUM_LSB,&h_data[0]);
+    i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_HUM_MSB,&h_data[1]);
 
-        temp_adc=((uint32_t)data[0])<<12 | ((uint32_t)data[1])<<4 | ((uint32_t)data[2])>>4;
-        temp_comp=temp_convert(temp_adc,p1,p2,p3)/100;
-        printk("T: %d (degrees Celsius)\n", temp_comp);
+    humidity_adc = ((uint32_t)h_data[0]) | ((uint32_t)h_data[1])<<8 ;
 
-        //humidity below
-        i2c_reg_read_byte(i2c_dev, BME680_ADDR,0xE2,&par_h[0]);//vary
-        i2c_reg_read_byte(i2c_dev, BME680_ADDR,0xE2,&par_h[2]);//vary
-        h1=(int32_t)((uint16_t)par_h[0] | (uint16_t)par_h[1]<<8);
-        h2=(int32_t)((uint16_t)par_h[2] | (uint16_t)par_h[3]<<8);
+    printk("H: %d (\%)\n", humidity_convert(temp_comp,humidity_adc,h1,h2,h3,h4,h5,h6,h7)/10000);
+
+    //read light value
+    int ret=i2c_reg_write_byte(i2c_dev, veml7700, COMMAND_CODE, 0x00);//mode
         
-        // BME680_HUM_LSB      0x26
-        // BME680_HUM_MSB      0x25 
-        i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_HUM_LSB,&h_data[0]);
-        i2c_reg_read_byte(i2c_dev, BME680_ADDR,BME680_HUM_MSB,&h_data[1]);
-
-        humidity_adc = ((uint32_t)h_data[0]) | ((uint32_t)h_data[1])<<8 ;
-
-        printk("H: %d (\%)\n", humidity_convert(temp_comp,humidity_adc,h1,h2,h3,h4,h5,h6,h7)/10000);
-
-        //read light value
-        int ret=i2c_reg_write_byte(i2c_dev, veml7700, COMMAND_CODE, 0x00);//mode
-        
-        if (ret != 0) {
-            printk("Failed to write command to VEML7700\n");
-            //continue;
-        }else{
+    if (ret != 0) {
+        printk("Failed to write command to VEML7700\n");
+        //continue;
+    }
+	else{
             // printk("good\n");
-        }
+	}
 
-        //i2c_reg_read_byte(i2c_dev,veml7700,VEML7700_High_Resolution_Output_Data, &light);
-        i2c_burst_read(i2c_dev,veml7700,VEML7700_High_Resolution_Output_Data,(uint8_t*)&light,2);
-        int16_t lightvalue=((int16_t)light[1]<<8) | (int16_t)light[0];//1 0
-        printk("L: %d\n",lightvalue);
+    //i2c_reg_read_byte(i2c_dev,veml7700,VEML7700_High_Resolution_Output_Data, &light);
+    i2c_burst_read(i2c_dev,veml7700,VEML7700_High_Resolution_Output_Data,(uint8_t*)&light,2);
+    int16_t lightvalue=((int16_t)light[1]<<8) | (int16_t)light[0];//1 0
+    printk("L: %d\n",lightvalue);
 
 }
 
