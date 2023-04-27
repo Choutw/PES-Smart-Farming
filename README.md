@@ -12,6 +12,9 @@
 
 * VEML 7700
   * Light
+
+* SEN 0114
+  * Moisture level
   
 # State machine
 
