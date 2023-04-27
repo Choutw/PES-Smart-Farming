@@ -1,4 +1,4 @@
-# Smart vertical farming
+# Smart vertical farming 
 
 # Hardware
 
