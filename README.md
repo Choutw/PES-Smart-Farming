@@ -7,14 +7,16 @@
 # Sensor
 
 * BME 680
-  * Temp
+  * Temperature
   * Hudmidity
 
-* VEML 7700
+* VEML 7700 
   * Light
 
-* SEN 0114
+* SEN 0114 (Analog Soil Moisture Sensor)
   * Moisture level
+
+
   
 # State machine
 
