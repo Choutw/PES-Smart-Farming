@@ -1,171 +1,96 @@
-#include <zephyr/kernel.h>
+/*
+ * Copyright (c) 2020 Libre Solar Technologies GmbH
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <inttypes.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/gpio.h>
-
-#include "inc/AnalogIn.h"
 #include <zephyr/drivers/adc.h>
-#include <string.h>
-#include <stdio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/util.h>
 
-// Simple analog input method
-// this just reads a sample then waits then returns it
-
-// ADC Sampling Settings
-// doc says that impedance of 800K == 40usec sample time
-
-//   # the sensor value description
-//   # 0  ~300     dry soil
-//   # 300~700     humid soil
-//   # 700~950     in water
-
-#define ADC_RESOLUTION		14
-#define ADC_GAIN			ADC_GAIN_1_6
-#define ADC_REFERENCE		ADC_REF_INTERNAL
-#define ADC_ACQUISITION_TIME	ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)
-#define BUFFER_SIZE			6
-
-static bool _IsInitialized = false;
-static uint8_t _LastChannel = 250;
-static int16_t m_sample_buffer[BUFFER_SIZE];
-
-// the channel configuration with channel not yet filled in
-static struct adc_channel_cfg m_1st_channel_cfg = {
-	.gain             = ADC_GAIN,
-	.reference        = ADC_REFERENCE,
-	.acquisition_time = ADC_ACQUISITION_TIME,
-	.channel_id       = 0, // gets set during init
-	.differential	  = 0,
-#if CONFIG_ADC_CONFIGURABLE_INPUTS
-	.input_positive   = 0, // gets set during init
+#if !DT_NODE_EXISTS(DT_PATH(zephyr_user)) || \
+	!DT_NODE_HAS_PROP(DT_PATH(zephyr_user), io_channels)
+#error "No suitable devicetree overlay specified"
 #endif
+
+#define DT_SPEC_AND_COMMA(node_id, prop, idx) \
+	ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
+
+/* Data of ADC io-channels specified in devicetree. */
+static const struct adc_dt_spec adc_channels[] = {
+	DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels,
+			     DT_SPEC_AND_COMMA)
 };
 
-
-
-// initialize the adc channel
-static const struct device* init_adc(int channel)
+void main(void)
 {
-	int ret;
-	
-	// Define adc device 
-	const struct device *adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
-
-    if (adc_dev == NULL || !device_is_ready(adc_dev)) {
-		printk("INFO: ADC device is not found.\n");
-	}
-	else{
-		printk("INFO: ADC device connected.\n");
-	}
-
-	if(_LastChannel != channel)
-	{
-		_IsInitialized = false;
-		_LastChannel = channel;
-	}
-
-	if ( adc_dev != NULL && !_IsInitialized)
-	{
-		// strangely channel_id gets the channel id and input_positive gets id+1
-		m_1st_channel_cfg.channel_id = channel;
-#if CONFIG_ADC_CONFIGURABLE_INPUTS
-        m_1st_channel_cfg.input_positive = channel+1,
-#endif
-		ret = adc_channel_setup(adc_dev, &m_1st_channel_cfg);
-		if(ret != 0)
-		{
-			//LOG_INF("Setting up of the first channel failed with code %d", ret);
-			adc_dev = NULL;
-		}
-		else
-		{
-			_IsInitialized = true;	// we don't have any other analog users
-		}
-	}
-	
-	memset(m_sample_buffer, 0, sizeof(m_sample_buffer));
-	return adc_dev;
-}
-
-// ------------------------------------------------
-// read one channel of adc
-// ------------------------------------------------
-static int16_t readOneChannel(int channel)
-{
-	const struct adc_sequence sequence = {
-		.options     = NULL,				// extra samples and callback
-		.channels    = BIT(channel),		// bit mask of channels to read
-		.buffer      = m_sample_buffer,		// where to put samples read
-		.buffer_size = sizeof(m_sample_buffer),
-		.resolution  = ADC_RESOLUTION,		// desired resolution
-		.oversampling = 0,					// don't oversample
-		.calibrate = 0						// don't calibrate
+	int err;
+	uint16_t buf;
+	struct adc_sequence sequence = {
+		.buffer = &buf,
+		/* buffer size in bytes, not number of samples */
+		.buffer_size = sizeof(buf),
 	};
 
-	int ret;
-	int16_t sample_value = BAD_ANALOG_READ;
-	const struct device *adc_dev = init_adc(channel);
-	if (adc_dev)
-	{
-		ret = adc_read(adc_dev, &sequence);
-		if(ret == 0)
-		{
-			sample_value = m_sample_buffer[0];
+	/* Configure channels individually prior to sampling. */
+	for (size_t i = 0U; i < ARRAY_SIZE(adc_channels); i++) {
+		if (!device_is_ready(adc_channels[i].dev)) {
+			printk("ADC controller device not ready\n");
+			return;
+		}
+
+		err = adc_channel_setup_dt(&adc_channels[i]);
+		if (err < 0) {
+			printk("Could not setup channel #%d (%d)\n", i, err);
+			return;
 		}
 	}
 
-	return sample_value;
-}
+	while (1) {
+		printk("ADC reading:\n");
+		for (size_t i = 0U; i < ARRAY_SIZE(adc_channels); i++) {
+			int32_t val_mv;
 
-// ------------------------------------------------
-// high level read adc channel and convert to float voltage
-// ------------------------------------------------
-float AnalogRead(int channel)
-{
+			printk("- %s, channel %d: ",
+			       adc_channels[i].dev->name,
+			       adc_channels[i].channel_id);
 
-	int16_t sv = readOneChannel(channel);
-	if(sv == BAD_ANALOG_READ)
-	{
-		return sv;
+			(void)adc_sequence_init_dt(&adc_channels[i], &sequence);
+
+			err = adc_read(adc_channels[i].dev, &sequence);
+			if (err < 0) {
+				printk("Could not read (%d)\n", err);
+				continue;
+			}
+
+			/*
+			 * If using differential mode, the 16 bit value
+			 * in the ADC sample buffer should be a signed 2's
+			 * complement value.
+			 */
+			if (adc_channels[i].channel_cfg.differential) {
+				val_mv = (int32_t)((int16_t)buf);
+			} else {
+				val_mv = (int32_t)buf;
+			}
+			printk("%"PRId32, val_mv);
+			err = adc_raw_to_millivolts_dt(&adc_channels[i],
+						       &val_mv);
+			/* conversion to mV may not be supported, skip if not */
+			if (err < 0) {
+				printk(" (value in mV not available)\n");
+			} else {
+				printk(" = %"PRId32" mV\n", val_mv);
+			}
+		}
+
+		k_sleep(K_MSEC(1000));
 	}
-
-	// Convert the result to voltage
-	// Result = [V(p) - V(n)] * GAIN/REFERENCE / 2^(RESOLUTION)
-																				  
-	int multip = 256;
-	// find 2**adc_resolution
-	switch(ADC_RESOLUTION)
-				
-	{
-		default :
-		case 8 :
-			multip = 256;
-			break;
-		case 10 :
-			multip = 1024;
-			break;
-		case 12 :
-			multip = 4096;
-			break;
-		case 14 :
-			multip = 16384;
-			break;
-	}
-	
-	float fout = (sv * 3.3 / multip);
-	return fout;
-}
-
-int main(){
-
-    float m_value;
-
-	while (1)
-	{
-        k_msleep(3000);
-		m_value = AnalogRead(0);
-		printf("m value : %.8f\n", m_value);
-	}
-
-	return 0;
 }
