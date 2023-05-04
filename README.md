@@ -2,15 +2,15 @@
 
 SVF ...
 
+
+
 # Hardware
+
+## Board  
 
 * Pi Pico maker
 
-# OS
-
-* Zephyr
-
-# Sensor
+## Sensor
 
 * BME 680
   * Temperature
@@ -21,6 +21,12 @@ SVF ...
 
 * SEN 0114 (Analog Soil Moisture Sensor)
   * Moisture level
+
+## RTOS
+
+* Zephyr
+
+
   
   
 # State machine
